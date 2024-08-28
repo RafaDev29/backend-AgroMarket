@@ -97,8 +97,13 @@ const listProductsByProducer = async (userId) => {
 
     const producerId = producer[0].id;
 
-    // Listar los productos del producer
+    // Listar los productos del producer junto con sus imágenes
     const [products] = await db.query('SELECT * FROM tb_products WHERE producer_id = ?', [producerId]);
+
+    for (let product of products) {
+      const [images] = await db.query('SELECT path FROM tb_image WHERE product_id = ?', [product.id]);
+      product.images = images.map(img => img.path);
+    }
 
     return products;
   } catch (err) {
@@ -106,10 +111,16 @@ const listProductsByProducer = async (userId) => {
   }
 };
 
+
 const listAllProducts = async () => {
   try {
-    // Listar todos los productos
+    // Listar todos los productos junto con sus imágenes
     const [products] = await db.query('SELECT * FROM tb_products');
+
+    for (let product of products) {
+      const [images] = await db.query('SELECT path FROM tb_image WHERE product_id = ?', [product.id]);
+      product.images = images.map(img => img.path);
+    }
 
     return products;
   } catch (err) {
