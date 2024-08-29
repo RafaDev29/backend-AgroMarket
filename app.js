@@ -9,7 +9,7 @@ const producersRoutes = require('./src/modules/producers/producersRoute');
 const productsRoutes = require('./src/modules/products/productsRoute');
 const categoryRoutes = require('./src/modules/category/categoryRoute');
 const imagesRoutes = require('./src/modules/images/imagesRoute'); 
-
+const saleRoutes = require('./src/modules/sales/saleRoute'); 
 const app = express();
 
 app.use(cors());
@@ -22,9 +22,10 @@ app.use('/api/producers', producersRoutes);
 app.use('/api/products', productsRoutes); 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/sales', saleRoutes)
 app.use('/api/images', imagesRoutes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5080;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
