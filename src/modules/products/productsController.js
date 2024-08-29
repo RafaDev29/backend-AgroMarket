@@ -12,8 +12,6 @@ const createProduct = async (req, res) => {
   try {
     // Obtener el userId del token JWT
     const userId = req.user.userId;
-
-    // Llamar al servicio para crear el producto y manejar las imágenes
     const result = await productsService.createProduct(req.body, userId, req.files);
     successResponse(res, 'Product created successfully with images', result);
   } catch (err) {

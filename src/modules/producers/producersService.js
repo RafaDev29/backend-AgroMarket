@@ -126,4 +126,6 @@ const updateProducer = async (producerId, data) => {
     }
   };
 
+  
+
 module.exports = { createProducer, listProducers, updateProducer };

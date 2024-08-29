@@ -43,4 +43,7 @@ const getProducers = async (req, res) => {
     }
   };
 
+
+
+
 module.exports = { createProducer, getProducers , updateProducer};
