@@ -262,4 +262,46 @@ const deleteProduct = async (productId, userId) => {
   }
 };
 
-module.exports = { createProduct , listProductsByProducer, listAllProducts, updateProduct, deleteProduct};
+const getProductById = async (productId) => {
+  try {
+    // Consulta para obtener los detalles del producto y del productor asociado
+    const [product] = await db.query(`
+      SELECT 
+        p.id AS productId, 
+        p.name, 
+        p.description, 
+        p.category_id, 
+        p.price, 
+        p.stock, 
+        p.unitExtent,
+        pr.bussinesName AS producerBussinesName,
+        pr.phone AS producerPhone
+      FROM tb_products p
+      JOIN tb_producers pr ON p.producer_id = pr.id
+      WHERE p.id = ?
+    `, [productId]);
+
+    if (product.length === 0) {
+      throw new Error('Producto no encontrado');
+    }
+
+    // Agrupar los datos del productor en un objeto
+    return {
+      productId: product[0].productId,
+      name: product[0].name,
+      description: product[0].description,
+      category_id: product[0].category_id,
+      price: product[0].price,
+      stock: product[0].stock,
+      unitExtent: product[0].unitExtent,
+      producer: {
+        bussinesName: product[0].producerBussinesName,
+        phone: product[0].producerPhone
+      }
+    };
+  } catch (err) {
+    throw new Error('Error al obtener el producto: ' + err.message);
+  }
+};
+
+module.exports = { createProduct , listProductsByProducer, listAllProducts, updateProduct, deleteProduct, getProductById};

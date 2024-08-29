@@ -72,4 +72,14 @@ const deleteProduct = async (req, res) => {
   }
 };
 
-module.exports = { createProduct, getProductsByProducer, getAllProducts, updateProduct, deleteProduct};
+const getProductById = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const product = await productsService.getProductById(productId);
+    successResponse(res, 'Producto obtenido exitosamente', product);
+  } catch (err) {
+    errorResponse(res, err.message, 404);
+  }
+};
+
+module.exports = { createProduct, getProductsByProducer, getAllProducts, updateProduct, deleteProduct, getProductById};

@@ -10,5 +10,6 @@ router.get('/list', jwtMiddleware, productsController.getProductsByProducer);
 router.get('/listAll', productsController.getAllProducts);
 router.patch('/:productId', jwtMiddleware, upload.array('images'), productsController.updateProduct);
 router.delete('/:productId', jwtMiddleware, productsController.deleteProduct);
+router.get('/:productId', productsController.getProductById);
 
 module.exports = router;
