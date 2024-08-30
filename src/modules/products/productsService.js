@@ -97,15 +97,39 @@ const listProductsByProducer = async (userId) => {
 
     const producerId = producer[0].id;
 
-    // Listar los productos del producer junto con sus imágenes
-    const [products] = await db.query('SELECT * FROM tb_products WHERE producer_id = ?', [producerId]);
+    // Listar los productos del producer junto con sus imágenes y unitExtentId
+    const [products] = await db.query(`
+      SELECT 
+        p.id AS productId, 
+        p.name, 
+        p.description, 
+        p.category_id, 
+        p.price, 
+        p.stock, 
+        p.unitExtent,
+        e.id AS unitExtentId
+      FROM tb_products p
+      LEFT JOIN tb_extend e ON p.unitExtent = e.name
+      WHERE p.producer_id = ?
+    `, [producerId]);
 
+    // Agregar las imágenes de cada producto
     for (let product of products) {
-      const [images] = await db.query('SELECT path FROM tb_image WHERE product_id = ?', [product.id]);
+      const [images] = await db.query('SELECT path FROM tb_image WHERE product_id = ?', [product.productId]);
       product.images = images.map(img => img.path);
     }
 
-    return products;
+    return products.map(product => ({
+      productId: product.productId,
+      name: product.name,
+      description: product.description,
+      category_id: product.category_id,
+      price: product.price,
+      stock: product.stock,
+      unitExtent: product.unitExtent,
+      unitExtentId: product.unitExtentId,
+      images: product.images
+    }));
   } catch (err) {
     throw new Error('Error retrieving products: ' + err.message);
   }
@@ -114,7 +138,7 @@ const listProductsByProducer = async (userId) => {
 
 const listAllProducts = async () => {
   try {
-    // Consultar todos los productos junto con sus detalles y los detalles del productor
+    // Consultar todos los productos junto con sus detalles, detalles del productor y unitExtentId
     const [products] = await db.query(`
       SELECT 
         p.id AS productId, 
@@ -125,9 +149,11 @@ const listAllProducts = async () => {
         p.stock, 
         p.unitExtent,
         pr.bussinesName AS producerBussinesName,
-        pr.phone AS producerPhone
+        pr.phone AS producerPhone,
+        e.id AS unitExtentId
       FROM tb_products p
       JOIN tb_producers pr ON p.producer_id = pr.id
+      LEFT JOIN tb_extend e ON p.unitExtent = e.name
     `);
 
     // Agregar las imágenes de cada producto
@@ -145,6 +171,7 @@ const listAllProducts = async () => {
       price: product.price,
       stock: product.stock,
       unitExtent: product.unitExtent,
+      unitExtentId: product.unitExtentId, // Agrega el unitExtentId al objeto
       producer: {
         bussinesName: product.producerBussinesName,
         phone: product.producerPhone
