@@ -10,6 +10,7 @@ const productsRoutes = require('./src/modules/products/productsRoute');
 const categoryRoutes = require('./src/modules/category/categoryRoute');
 const imagesRoutes = require('./src/modules/images/imagesRoute'); 
 const saleRoutes = require('./src/modules/sales/saleRoute'); 
+const extendRoutes = require('./src/modules/extend/extendRoute')
 const app = express();
 
 app.use(cors());
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/sales', saleRoutes)
 app.use('/api/images', imagesRoutes);
+app.use('/api/extend', extendRoutes)
 
 const PORT = process.env.PORT || 5080;
 app.listen(PORT, () => {

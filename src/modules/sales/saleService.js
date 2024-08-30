@@ -28,15 +28,15 @@ const createSale = async (data, user_id, role) => {
 
     const customerId = customer[0].id;
 
-    // Obtener el precio y unitExtent del producto desde la tabla tb_products
-    const [product] = await connection.query('SELECT price, unitExtent FROM tb_products WHERE id = ?', [data.product_id]);
+    // Obtener el precio del producto desde la tabla tb_products
+    const [product] = await connection.query('SELECT price FROM tb_products WHERE id = ?', [data.product_id]);
 
     if (product.length === 0) {
       throw new Error('El producto no existe');
     }
 
     const unitPrice = product[0].price;
-    const unitExtent = product[0].unitExtent;
+    const unitExtent = data.unitExtent; // Usar el unitExtent proporcionado en lugar de buscarlo en la base de datos
 
     // Calcular el subtotal y el IGV
     const subtotal = unitPrice * data.amount;
@@ -70,6 +70,7 @@ const createSale = async (data, user_id, role) => {
     connection.release();
   }
 };
+
 const processFileName = (saleId, voucherId, originalName) => {
     const extension = originalName.split('.').pop(); // Obtener la extensión del archivo
     return `voucher_${saleId}_${voucherId}.${extension}`; // Generar el nuevo nombre de archivo
