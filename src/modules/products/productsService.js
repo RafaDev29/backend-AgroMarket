@@ -114,19 +114,50 @@ const listProductsByProducer = async (userId) => {
 
 const listAllProducts = async () => {
   try {
-    // Listar todos los productos junto con sus imágenes
-    const [products] = await db.query('SELECT * FROM tb_products');
+    // Consultar todos los productos junto con sus detalles y los detalles del productor
+    const [products] = await db.query(`
+      SELECT 
+        p.id AS productId, 
+        p.name, 
+        p.description, 
+        p.category_id, 
+        p.price, 
+        p.stock, 
+        p.unitExtent,
+        pr.bussinesName AS producerBussinesName,
+        pr.phone AS producerPhone
+      FROM tb_products p
+      JOIN tb_producers pr ON p.producer_id = pr.id
+    `);
 
+    // Agregar las imágenes de cada producto
     for (let product of products) {
-      const [images] = await db.query('SELECT path FROM tb_image WHERE product_id = ?', [product.id]);
+      const [images] = await db.query('SELECT path FROM tb_image WHERE product_id = ?', [product.productId]);
       product.images = images.map(img => img.path);
     }
 
-    return products;
+    // Formatear los datos de los productos con sus productores en un objeto
+    const formattedProducts = products.map(product => ({
+      productId: product.productId,
+      name: product.name,
+      description: product.description,
+      category_id: product.category_id,
+      price: product.price,
+      stock: product.stock,
+      unitExtent: product.unitExtent,
+      producer: {
+        bussinesName: product.producerBussinesName,
+        phone: product.producerPhone
+      },
+      images: product.images
+    }));
+
+    return formattedProducts;
   } catch (err) {
-    throw new Error('Error retrieving products: ' + err.message);
+    throw new Error('Error al obtener los productos: ' + err.message);
   }
 };
+
 
 const updateProduct = async (productId, data, userId, files) => {
   const connection = await db.getConnection();
