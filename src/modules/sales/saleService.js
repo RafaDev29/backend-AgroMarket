@@ -19,43 +19,63 @@ const createSale = async (data, user_id, role) => {
   try {
     await connection.beginTransaction();
 
-    // Obtener el customer_id utilizando el user_id del token
+    // Verificar que el extend_id existe en la tabla tb_extend
+    const [extend] = await connection.query('SELECT id, name FROM tb_extend WHERE id = ?', [data.extend_id]);
+    if (extend.length === 0) {
+      throw new Error('La unidad de medida no es válida');
+    }
+
+    const unitName = extend[0].name.toLowerCase(); // Convertimos a minúsculas
+    console.log('Unidad seleccionada por el cliente (unitName):', unitName);
+
     const [customer] = await connection.query('SELECT id FROM tb_customer WHERE user_id = ?', [user_id]);
-  
     if (customer.length === 0) {
       throw new Error('El cliente no existe');
     }
 
     const customerId = customer[0].id;
+    console.log('Customer ID:', customerId);
 
-    // Obtener el precio del producto desde la tabla tb_products
-    const [product] = await connection.query('SELECT price FROM tb_products WHERE id = ?', [data.product_id]);
-
+    const [product] = await connection.query('SELECT price, unitExtent FROM tb_products WHERE id = ?', [data.product_id]);
     if (product.length === 0) {
       throw new Error('El producto no existe');
     }
 
-    const unitPrice = product[0].price;
-    const unitExtent = data.unitExtent; // Usar el unitExtent proporcionado en lugar de buscarlo en la base de datos
+    const unitPrice = parseFloat(product[0].price);
+    const productUnit = product[0].unitExtent.toLowerCase(); // Convertimos a minúsculas
+    console.log('Unidad de medida del producto (productUnit):', productUnit);
+    console.log('Precio unitario del producto (unitPrice):', unitPrice);
 
-    // Calcular el subtotal y el IGV
-    const subtotal = unitPrice * data.amount;
+    let subtotal;
+
+    // Verificar si la unidad seleccionada es diferente a la del producto
+    if (unitName === "tn" && productUnit === "kg") {
+      subtotal = unitPrice * 1000 * data.amount; // Convertir toneladas a kilogramos
+      console.log('Subtotal calculado (con conversión de Tn a kg):', subtotal);
+    } else if (unitName === productUnit) {
+      subtotal = unitPrice * data.amount; // No es necesaria la conversión
+      console.log('Subtotal calculado (sin conversión, unidades coinciden):', subtotal);
+    } else {
+      throw new Error('Las unidades de medida no coinciden o la conversión no está soportada.');
+    }
+
     const igv = subtotal * 0.18;
-
-    // Calcular el totalPrice
     const totalPrice = subtotal + igv;
+    console.log('IGV calculado:', igv);
+    console.log('Precio total calculado (totalPrice):', totalPrice);
 
-    // Insertar en tb_sales
     const saleQuery = 'INSERT INTO tb_sales (customer_id, amount, totalPrice) VALUES (?, ?, ?)';
     const saleValues = [customerId, data.amount, totalPrice];
     const [saleResult] = await connection.query(saleQuery, saleValues);
 
     const saleId = saleResult.insertId;
+    console.log('Sale ID:', saleId);
 
-    // Insertar detalles en tb_detailSale
-    const detailQuery = 'INSERT INTO tb_detailSale (sale_id, product_id, unitPrice, igv, unitExtent, voucher_id, status, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-    const detailValues = [saleId, data.product_id, unitPrice, igv, unitExtent, null, 'solicitado', subtotal];
+    // Guardar los detalles de la venta
+    const detailQuery = 'INSERT INTO tb_detailSale (sale_id, product_id, unitPrice, igv, extend_id, voucher_id, status, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+    const detailValues = [saleId, data.product_id, unitPrice, igv, data.extend_id, null, 'solicitado', subtotal];
     await connection.query(detailQuery, detailValues);
+    console.log('Detalle de la venta guardado con valores:', detailValues);
 
     await connection.commit();
 
@@ -71,10 +91,15 @@ const createSale = async (data, user_id, role) => {
   }
 };
 
+
+
 const processFileName = (saleId, voucherId, originalName) => {
     const extension = originalName.split('.').pop(); // Obtener la extensión del archivo
     return `voucher_${saleId}_${voucherId}.${extension}`; // Generar el nuevo nombre de archivo
   };
+
+
+  
 
 const updateSale = async (saleId, data, file, userRole) => {
     if (userRole !== 'PRODUCER') {
@@ -98,34 +123,37 @@ const updateSale = async (saleId, data, file, userRole) => {
   
       const currentStatus = details[0].status;
   
-      // Si el status es "culminado", no permitir la edición
-      if (currentStatus === 'culminado') {
-        throw new Error('No se puede editar una venta con estado "culminado"');
+      // Validar que el estado no retroceda
+      const validTransitions = {
+        'solicitado': ['activo', 'aprobado'],
+        'activo': ['aprobado', 'culminado'],
+        'aprobado': ['culminado'],
+        'culminado': []
+      };
+
+      if (!validTransitions[currentStatus].includes(data.status)) {
+        throw new Error(`No se puede cambiar el estado de "${currentStatus}" a "${data.status}".`);
       }
   
       let voucherId = details[0].voucher_id;
-      let fileName = null;  // Inicializamos fileName como null
+      let fileName = null;
   
       if (file) {
-        const voucherType = 'COMPROBANTE'; // Tipo de voucher definido
+        const voucherType = 'COMPROBANTE';
   
-        // Generar el nombre del archivo de la imagen del voucher
-        fileName = processFileName(saleId, voucherId || 0, file.originalname);  // Generamos el nombre antes de insertar o actualizar
+        fileName = processFileName(saleId, voucherId || 0, file.originalname);
   
-        // Si no existe un voucher_id con el type 'COMPROBANTE', crear uno nuevo
         if (!voucherId) {
           const voucherQuery = 'INSERT INTO tb_voucher (path, sale_id, type) VALUES (?, ?, ?)';
           const [voucherResult] = await connection.query(voucherQuery, [fileName, saleId, voucherType]);
           voucherId = voucherResult.insertId;
         } else {
-          // Si ya existe un voucher, actualizamos su type y path
           const updateVoucherQuery = 'UPDATE tb_voucher SET path = ?, type = ? WHERE id = ?';
           await connection.query(updateVoucherQuery, [fileName, voucherType, voucherId]);
         }
   
         const remoteFilePath = `${remotePath}/${fileName}`;
   
-        // Conectar y subir la imagen al servidor remoto
         await sftp.connect({
           host: remoteHost,
           username: remoteUser,
@@ -134,23 +162,75 @@ const updateSale = async (saleId, data, file, userRole) => {
         await sftp.put(file.buffer, remoteFilePath);
         sftp.end();
   
-        // Asegurarse de que el voucher_id en tb_detailSale es el correcto
         await connection.query('UPDATE tb_detailSale SET voucher_id = ? WHERE sale_id = ?', [voucherId, saleId]);
       }
   
       if (data.status) {
+        // Si la venta ya estaba aprobada o culminado, permitir la edición pero no modificar el stock
+        if (currentStatus === 'aprobado' || currentStatus === 'culminado') {
+          await connection.query('UPDATE tb_detailSale SET status = ? WHERE sale_id = ?', [data.status, saleId]);
+          await connection.commit();
+
+          return {
+            saleId,
+            message: 'La venta ya está aprobada, se ha actualizado el voucher.',
+            data: {
+              saleId,
+              status: data.status,
+              voucher_id: voucherId,
+              voucher_path: fileName,
+              product_id: details[0].product_id,
+              unitPrice: details[0].unitPrice,
+              igv: details[0].igv,
+              unitExtent: details[0].unitExtent,
+              subtotal: details[0].subtotal
+            }
+          };
+        }
+
         const updateStatusQuery = 'UPDATE tb_detailSale SET status = ? WHERE sale_id = ?';
         await connection.query(updateStatusQuery, [data.status, saleId]);
   
         // Si el status es "aprobado", reducir el stock del producto usando `amount`
         if (data.status === 'aprobado') {
           const [saleDetails] = await connection.query('SELECT amount FROM tb_sales WHERE id = ?', [saleId]);
-          const amountSold = parseFloat(saleDetails[0].amount); // Convertir `amount` a número
+          const amountSold = parseFloat(saleDetails[0].amount);
           if (isNaN(amountSold)) {
             throw new Error('El valor de amount no es válido.');
           }
-          const updateProductStockQuery = 'UPDATE tb_products SET stock = stock - ? WHERE id = ?';
-          await connection.query(updateProductStockQuery, [amountSold, details[0].product_id]);
+
+          // Obtener el unitExtent del producto para verificar la unidad y el stock
+          const [product] = await connection.query('SELECT unitExtent, stock FROM tb_products WHERE id = ?', [details[0].product_id]);
+          const productUnit = product[0].unitExtent.toLowerCase();
+          const currentStock = parseFloat(product[0].stock);
+
+          // Obtener el extend_id usado en la venta
+          const [extend] = await connection.query('SELECT name FROM tb_extend WHERE id = ?', [details[0].extend_id]);
+          const saleUnit = extend[0].name.toLowerCase();
+
+          let adjustedAmount;
+
+          if (saleUnit === "tn" && productUnit === "kg") {
+            adjustedAmount = amountSold * 1000; // Convertir toneladas a kilogramos
+          } else if (saleUnit === productUnit) {
+            adjustedAmount = amountSold; // No es necesaria la conversión
+          } else {
+            throw new Error('Las unidades de medida no coinciden o la conversión no está soportada.');
+          }
+
+          console.log('Stock antes de la reducción:', currentStock);
+          console.log('Cantidad a reducir del stock:', adjustedAmount);
+
+          // Validar si el stock es suficiente
+          if (adjustedAmount > currentStock) {
+            throw new Error('Stock insuficiente para la cantidad seleccionada.');
+          }
+
+          const newStock = currentStock - adjustedAmount;
+          const updateProductStockQuery = 'UPDATE tb_products SET stock = ? WHERE id = ?';
+          await connection.query(updateProductStockQuery, [newStock, details[0].product_id]);
+
+          console.log('Nuevo stock después de la reducción:', newStock);
         }
       }
   
@@ -184,6 +264,9 @@ const updateSale = async (saleId, data, file, userRole) => {
       connection.release();
     }
   };
+
+
+
 
 const addPaymentImage = async (userId, saleId, file) => {
     const connection = await db.getConnection();

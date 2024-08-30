@@ -199,25 +199,16 @@ const updateProduct = async (productId, data, userId, files) => {
 
     await connection.query(updateQuery, updateValues);
 
-    // Manejar imágenes si se incluyen en la solicitud
+    // Manejar nuevas imágenes si se incluyen en la solicitud
+    let newImageNames = [];
+
     if (files && files.length > 0) {
-      // Eliminar imágenes antiguas si se suben nuevas imágenes
-      const [oldImages] = await connection.query('SELECT path FROM tb_image WHERE product_id = ?', [productId]);
-      
-      // Conectar al servidor remoto para eliminar archivos antiguos y subir nuevos
+      // Conectar al servidor remoto para subir nuevas imágenes
       await sftp.connect({
         host: remoteHost,
         username: remoteUser,
         password: remotePassword
       });
-
-      for (const oldImage of oldImages) {
-        const remoteFilePath = `${remotePath}/${oldImage.path}`;
-        await sftp.delete(remoteFilePath); // Eliminar la imagen antigua del servidor
-        await connection.query('DELETE FROM tb_image WHERE product_id = ? AND path = ?', [productId, oldImage.path]); // Eliminar referencia de la base de datos
-      }
-
-      const newImageNames = [];
 
       for (const file of files) {
         const imageQuery = 'INSERT INTO tb_image (product_id, path) VALUES (?, ?)';
@@ -235,22 +226,19 @@ const updateProduct = async (productId, data, userId, files) => {
       }
 
       sftp.end();
-
-      await connection.commit();
-      return {
-        productId,
-        ...data,
-        images: newImageNames
-      };
-    } else {
-      // Si no se incluyen imágenes, solo actualiza los campos y no toques las imágenes existentes
-      await connection.commit();
-      return {
-        productId,
-        ...data,
-        images: null // No se han cambiado las imágenes
-      };
     }
+
+    await connection.commit();
+
+    // Obtener todas las imágenes del producto, incluidas las nuevas
+    const [allImages] = await connection.query('SELECT path FROM tb_image WHERE product_id = ?', [productId]);
+    const allImageNames = allImages.map(image => image.path);
+
+    return {
+      productId,
+      ...data,
+      images: allImageNames // Devolver todas las imágenes, incluidas las nuevas
+    };
   } catch (err) {
     await connection.rollback();
     sftp.end();

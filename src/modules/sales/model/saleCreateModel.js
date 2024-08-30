@@ -9,10 +9,9 @@ const saleCreateModel = Joi.object({
     'number.base': 'El campo "amount" debe ser un número entero',
     'any.required': 'El campo "amount" es obligatorio'
   }),
-
-  unitExtent: Joi.required().messages({
-    
-    'any.required': 'El campo "amount" es obligatorio'
+  extend_id: Joi.number().integer().required().messages({
+    'number.base': 'El campo "extend_id" debe ser un número entero',
+    'any.required': 'El campo "extend_id" es obligatorio'
   })
 });
 

@@ -7,14 +7,9 @@ const createSale = async (req, res) => {
     const user_id = req.user.userId;
 
     // Asegúrate de que `unitExtent` esté incluido en el cuerpo de la solicitud
-    const { product_id, amount, unitExtent } = req.body;
+    const { product_id, amount, extend_id } = req.body;
 
-    // Validar que `unitExtent` esté presente en la solicitud
-    if (!unitExtent) {
-      throw new Error('El campo unitExtent es obligatorio');
-    }
-
-    const result = await saleService.createSale({ product_id, amount, unitExtent }, user_id, role);
+    const result = await saleService.createSale({ product_id, amount, extend_id }, user_id, role);
     successResponse(res, result.message, { saleId: result.saleId });
   } catch (err) {
     errorResponse(res, err.message, 400);
