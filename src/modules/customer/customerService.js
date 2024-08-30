@@ -16,7 +16,7 @@ const createCustomer = async (data) => {
     }
 
     // Validar que el DNI tenga 7 dígitos
-    if (!/^\d{7}$/.test(data.document)) {
+    if (!/^\d{8}$/.test(data.document)) {
       throw new Error('Document (DNI) must have exactly 7 digits');
     }
 
