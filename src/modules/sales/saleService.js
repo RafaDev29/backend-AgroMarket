@@ -341,7 +341,7 @@ const addPaymentImage = async (userId, saleId, file) => {
     }
   };
   
-const listSales = async (userId, role) => {
+  const listSales = async (userId, role) => {
     try {
       let salesQuery;
       let salesParams;
@@ -349,18 +349,29 @@ const listSales = async (userId, role) => {
       // Definir la consulta SQL en función del rol
       if (role === 'CUSTOMER') {
         salesQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.unitExtent, ds.status, ds.subtotal
+          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
+                 p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
+                 c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
+                 e.name as unitName
           FROM tb_sales s
           JOIN tb_detailSale ds ON s.id = ds.sale_id
+          JOIN tb_products p ON ds.product_id = p.id
+          JOIN tb_customer c ON s.customer_id = c.id
+          JOIN tb_extend e ON ds.extend_id = e.id
           WHERE s.customer_id = (SELECT id FROM tb_customer WHERE user_id = ?)
         `;
         salesParams = [userId];
       } else if (role === 'PRODUCER') {
         salesQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.unitExtent, ds.status, ds.subtotal
+          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
+                 p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
+                 c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
+                 e.name as unitName
           FROM tb_sales s
           JOIN tb_detailSale ds ON s.id = ds.sale_id
           JOIN tb_products p ON ds.product_id = p.id
+          JOIN tb_customer c ON s.customer_id = c.id
+          JOIN tb_extend e ON ds.extend_id = e.id
           WHERE p.producer_id = (SELECT id FROM tb_producers WHERE user_id = ?)
         `;
         salesParams = [userId];
@@ -381,6 +392,49 @@ const listSales = async (userId, role) => {
           COMPROBANTE: vouchers.filter(v => v.type === 'COMPROBANTE').map(v => v.path),
           PAY: vouchers.filter(v => v.type === 'PAY').map(v => v.path)
         };
+  
+        // Organizar los datos del producto, cliente, y unidad de medida en objetos
+        sale.product = {
+          id: sale.product_id,
+          name: sale.productName,
+          description: sale.productDescription,
+          category_id: sale.category_id,
+          price: sale.productPrice,
+          stock: sale.stock,
+          unitExtent: sale.unitExtent
+        };
+  
+        sale.customer = {
+          id: sale.customer_id,
+          firstName: sale.customerFirstName,
+          lastName: sale.customerLastName,
+          bussinesName: sale.bussinesName,
+          phone: sale.phone,
+          document: sale.document
+        };
+  
+        sale.unit = {
+          id: sale.extend_id,
+          name: sale.unitName
+        };
+  
+        // Eliminar los campos planos originales para evitar redundancia
+        delete sale.product_id;
+        delete sale.productName;
+        delete sale.productDescription;
+        delete sale.category_id;
+        delete sale.productPrice;
+        delete sale.stock;
+        delete sale.unitExtent;
+        
+        delete sale.customerFirstName;
+        delete sale.customerLastName;
+        delete sale.bussinesName;
+        delete sale.phone;
+        delete sale.document;
+        
+        delete sale.extend_id;
+        delete sale.unitName;
       }
   
       return sales;
@@ -388,6 +442,7 @@ const listSales = async (userId, role) => {
       throw new Error('Error al listar las ventas: ' + err.message);
     }
   };
+  
 
 const getSaleById = async (userId, role, saleId) => {
     try {
@@ -397,7 +452,7 @@ const getSaleById = async (userId, role, saleId) => {
       // Definir la consulta SQL en función del rol
       if (role === 'CUSTOMER') {
         saleQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.unitExtent, ds.status, ds.subtotal
+          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal
           FROM tb_sales s
           JOIN tb_detailSale ds ON s.id = ds.sale_id
           WHERE s.id = ? AND s.customer_id = (SELECT id FROM tb_customer WHERE user_id = ?)
@@ -405,7 +460,7 @@ const getSaleById = async (userId, role, saleId) => {
         saleParams = [saleId, userId];
       } else if (role === 'PRODUCER') {
         saleQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.unitExtent, ds.status, ds.subtotal
+          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal
           FROM tb_sales s
           JOIN tb_detailSale ds ON s.id = ds.sale_id
           JOIN tb_products p ON ds.product_id = p.id

@@ -128,6 +128,7 @@ const listProductsByProducer = async (userId) => {
       stock: product.stock,
       unitExtent: product.unitExtent,
       unitExtentId: product.unitExtentId,
+      
       images: product.images
     }));
   } catch (err) {
