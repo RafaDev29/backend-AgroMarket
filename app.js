@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan');
 const customerRoutes = require('./src/modules/customer/customerRoute');
 const responseHandler = require('./src/middleware/responseHandler');
 const encryptRoutes = require('./src/modules/encrypt/encryptRoute');
@@ -14,6 +15,7 @@ const extendRoutes = require('./src/modules/extend/extendRoute')
 const app = express();
 
 app.use(cors());
+app.use(morgan('combined'))
 app.use(express.json());
 app.use(responseHandler);
 

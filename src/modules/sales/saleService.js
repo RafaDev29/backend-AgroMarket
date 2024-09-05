@@ -343,51 +343,40 @@ const addPaymentImage = async (userId, saleId, file) => {
   
   const listSales = async (userId, role) => {
     try {
-      let salesQuery;
-      let salesParams;
+      let roleCondition;
   
-      // Definir la consulta SQL en función del rol
+      // Definir la condición de consulta SQL en función del rol
       if (role === 'CUSTOMER') {
-        salesQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
-                 p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
-                 c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
-                 e.name as unitName
-          FROM tb_sales s
-          JOIN tb_detailSale ds ON s.id = ds.sale_id
-          JOIN tb_products p ON ds.product_id = p.id
-          JOIN tb_customer c ON s.customer_id = c.id
-          JOIN tb_extend e ON ds.extend_id = e.id
-          WHERE s.customer_id = (SELECT id FROM tb_customer WHERE user_id = ?)
-        `;
-        salesParams = [userId];
+        roleCondition = `s.customer_id = (SELECT id FROM tb_customer WHERE user_id = ?)`;
       } else if (role === 'PRODUCER') {
-        salesQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
-                 p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
-                 c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
-                 e.name as unitName
-          FROM tb_sales s
-          JOIN tb_detailSale ds ON s.id = ds.sale_id
-          JOIN tb_products p ON ds.product_id = p.id
-          JOIN tb_customer c ON s.customer_id = c.id
-          JOIN tb_extend e ON ds.extend_id = e.id
-          WHERE p.producer_id = (SELECT id FROM tb_producers WHERE user_id = ?)
-        `;
-        salesParams = [userId];
+        roleCondition = `p.producer_id = (SELECT id FROM tb_producers WHERE user_id = ?)`;
       } else {
         throw new Error('Rol no autorizado para listar ventas.');
       }
   
+      // Consulta SQL común
+      const salesQuery = `
+        SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
+               p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
+               c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
+               e.name as unitName
+        FROM tb_sales s
+        JOIN tb_detailSale ds ON s.id = ds.sale_id
+        JOIN tb_products p ON ds.product_id = p.id
+        JOIN tb_customer c ON s.customer_id = c.id
+        JOIN tb_extend e ON ds.extend_id = e.id
+        WHERE ${roleCondition}
+      `;
+  
+      const salesParams = [userId];
       const [sales] = await db.query(salesQuery, salesParams);
   
-      // Agregar los nombres de los vouchers según el tipo
       for (let sale of sales) {
+        // Obtener los nombres de los vouchers
         const [vouchers] = await db.query(
           'SELECT type, path FROM tb_voucher WHERE sale_id = ?',
           [sale.saleId]
         );
-  
         sale.vouchers = {
           COMPROBANTE: vouchers.filter(v => v.type === 'COMPROBANTE').map(v => v.path),
           PAY: vouchers.filter(v => v.type === 'PAY').map(v => v.path)
@@ -404,6 +393,13 @@ const addPaymentImage = async (userId, saleId, file) => {
           unitExtent: sale.unitExtent
         };
   
+        // Obtener las imágenes del producto
+        const [images] = await db.query(
+          'SELECT path FROM tb_image WHERE product_id = ?',
+          [sale.product.id]
+        );
+        sale.product.images = images.map(img => img.path);
+  
         sale.customer = {
           id: sale.customer_id,
           firstName: sale.customerFirstName,
@@ -418,23 +414,13 @@ const addPaymentImage = async (userId, saleId, file) => {
           name: sale.unitName
         };
   
-        // Eliminar los campos planos originales para evitar redundancia
-        delete sale.product_id;
-        delete sale.productName;
-        delete sale.productDescription;
-        delete sale.category_id;
-        delete sale.productPrice;
-        delete sale.stock;
-        delete sale.unitExtent;
-        
-        delete sale.customerFirstName;
-        delete sale.customerLastName;
-        delete sale.bussinesName;
-        delete sale.phone;
-        delete sale.document;
-        
-        delete sale.extend_id;
-        delete sale.unitName;
+        // Eliminar los campos redundantes
+        const redundantFields = [
+          'product_id', 'productName', 'productDescription', 'category_id', 'productPrice', 'stock', 'unitExtent',
+          'customerFirstName', 'customerLastName', 'bussinesName', 'phone', 'document',
+          'extend_id', 'unitName'
+        ];
+        redundantFields.forEach(field => delete sale[field]);
       }
   
       return sales;
@@ -443,45 +429,35 @@ const addPaymentImage = async (userId, saleId, file) => {
     }
   };
   
-
   const getSaleById = async (userId, role, saleId) => {
     try {
       let saleQuery;
-      let saleParams;
-  
-      // Definir la consulta SQL en función del rol
+      let roleCondition;
+      
+      // Definir la condición de consulta SQL en función del rol
       if (role === 'CUSTOMER') {
-        saleQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
-                 p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
-                 c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
-                 e.name as unitName
-          FROM tb_sales s
-          JOIN tb_detailSale ds ON s.id = ds.sale_id
-          JOIN tb_products p ON ds.product_id = p.id
-          JOIN tb_customer c ON s.customer_id = c.id
-          JOIN tb_extend e ON ds.extend_id = e.id
-          WHERE s.id = ? AND s.customer_id = (SELECT id FROM tb_customer WHERE user_id = ?)
-        `;
-        saleParams = [saleId, userId];
+        roleCondition = `s.customer_id = (SELECT id FROM tb_customer WHERE user_id = ?)`;
       } else if (role === 'PRODUCER') {
-        saleQuery = `
-          SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
-                 p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
-                 c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
-                 e.name as unitName
-          FROM tb_sales s
-          JOIN tb_detailSale ds ON s.id = ds.sale_id
-          JOIN tb_products p ON ds.product_id = p.id
-          JOIN tb_customer c ON s.customer_id = c.id
-          JOIN tb_extend e ON ds.extend_id = e.id
-          WHERE s.id = ? AND p.producer_id = (SELECT id FROM tb_producers WHERE user_id = ?)
-        `;
-        saleParams = [saleId, userId];
+        roleCondition = `p.producer_id = (SELECT id FROM tb_producers WHERE user_id = ?)`;
       } else {
         throw new Error('Rol no autorizado para ver esta venta.');
       }
   
+      // Consulta SQL
+      saleQuery = `
+        SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
+               p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
+               c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone, c.document,
+               e.name as unitName
+        FROM tb_sales s
+        JOIN tb_detailSale ds ON s.id = ds.sale_id
+        JOIN tb_products p ON ds.product_id = p.id
+        JOIN tb_customer c ON s.customer_id = c.id
+        JOIN tb_extend e ON ds.extend_id = e.id
+        WHERE s.id = ? AND ${roleCondition}
+      `;
+  
+      const saleParams = [saleId, userId];
       const [sales] = await db.query(saleQuery, saleParams);
   
       if (sales.length === 0) {
@@ -490,7 +466,7 @@ const addPaymentImage = async (userId, saleId, file) => {
   
       let sale = sales[0];
   
-      // Agregar los nombres de los vouchers según el tipo
+      // Obtener los nombres de los vouchers
       const [vouchers] = await db.query(
         'SELECT type, path FROM tb_voucher WHERE sale_id = ?',
         [sale.saleId]
@@ -512,6 +488,14 @@ const addPaymentImage = async (userId, saleId, file) => {
         unitExtent: sale.unitExtent
       };
   
+      // Obtener las imágenes del producto
+      const [images] = await db.query(
+        'SELECT path FROM tb_image WHERE product_id = ?',
+        [sale.product.id]
+      );
+  
+      sale.product.images = images.map(img => img.path);
+  
       sale.customer = {
         id: sale.customer_id,
         firstName: sale.customerFirstName,
@@ -526,23 +510,13 @@ const addPaymentImage = async (userId, saleId, file) => {
         name: sale.unitName
       };
   
-      // Eliminar los campos planos originales para evitar redundancia
-      delete sale.product_id;
-      delete sale.productName;
-      delete sale.productDescription;
-      delete sale.category_id;
-      delete sale.productPrice;
-      delete sale.stock;
-      delete sale.unitExtent;
-      
-      delete sale.customerFirstName;
-      delete sale.customerLastName;
-      delete sale.bussinesName;
-      delete sale.phone;
-      delete sale.document;
-      
-      delete sale.extend_id;
-      delete sale.unitName;
+      // Eliminar campos redundantes
+      const redundantFields = [
+        'product_id', 'productName', 'productDescription', 'category_id', 'productPrice', 'stock', 'unitExtent',
+        'customerFirstName', 'customerLastName', 'bussinesName', 'phone', 'document',
+        'extend_id', 'unitName'
+      ];
+      redundantFields.forEach(field => delete sale[field]);
   
       return sale;
     } catch (err) {
