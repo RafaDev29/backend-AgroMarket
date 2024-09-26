@@ -3,11 +3,12 @@ const Client = require('ssh2-sftp-client');
 const sftp = new Client();
 
 
-const processFileName = (productId, imageId, productName, originalName) => {
+const processFileName = (productId, imageId, productName = 'product', originalName = 'image.jpg') => {
   const sanitizedProductName = productName.replace(/\s+/g, '-').toLowerCase(); // Reemplaza espacios y convierte a minúsculas
   const extension = originalName.split('.').pop(); // Obtiene la extensión del archivo
   return `${productId}-${imageId}-${sanitizedProductName}.${extension}`; // Genera el nuevo nombre de archivo
 };
+
 
 const createProduct = async (data, userId, files) => {
   const connection = await db.getConnection();
@@ -222,30 +223,24 @@ const updateProduct = async (productId, data, userId, files) => {
       throw new Error('This product does not belong to you or does not exist');
     }
 
-    // Actualizar los demás campos del producto en la base de datos
+    // Filtrar solo los campos definidos en data para construir la consulta de actualización
+    const fieldsToUpdate = Object.keys(data).filter(key => data[key] !== undefined);
     const updateQuery = `
-  UPDATE tb_products 
-  SET name = ?, description = ?, category_id = ?, price = ?, bulk_price = ?, bulk_quantity = ?, stock = ?, unitExtent = ? 
-  WHERE id = ?`;
-  const updateValues = [
-    data.name,
-    data.description,
-    data.category_id,
-    data.price,
-    data.bulk_price || null,       
-    data.bulk_quantity || null,    
-    data.stock,
-    data.unitExtent,
-    productId
-  ];
+      UPDATE tb_products 
+      SET ${fieldsToUpdate.map(field => `${field} = ?`).join(', ')} 
+      WHERE id = ?`;
 
-    await connection.query(updateQuery, updateValues);
+    const updateValues = [...fieldsToUpdate.map(field => data[field]), productId];
+
+    // Solo ejecutar la consulta si hay campos que actualizar
+    if (fieldsToUpdate.length > 0) {
+      await connection.query(updateQuery, updateValues);
+    }
 
     // Manejar nuevas imágenes si se incluyen en la solicitud
     let newImageNames = [];
 
     if (files && files.length > 0) {
-      // Conectar al servidor remoto para subir nuevas imágenes
       await sftp.connect({
         host: remoteHost,
         username: remoteUser,
@@ -261,9 +256,7 @@ const updateProduct = async (productId, data, userId, files) => {
         const remoteFilePath = `${remotePath}/${newFileName}`;
         await sftp.put(file.buffer, remoteFilePath);
 
-        // Actualizar la entrada de la imagen con el nombre de archivo correcto
         await connection.query('UPDATE tb_image SET path = ? WHERE id = ?', [newFileName, imageId]);
-
         newImageNames.push(newFileName);
       }
 
@@ -272,14 +265,13 @@ const updateProduct = async (productId, data, userId, files) => {
 
     await connection.commit();
 
-    // Obtener todas las imágenes del producto, incluidas las nuevas
     const [allImages] = await connection.query('SELECT path FROM tb_image WHERE product_id = ?', [productId]);
     const allImageNames = allImages.map(image => image.path);
 
     return {
       productId,
       ...data,
-      images: allImageNames // Devolver todas las imágenes, incluidas las nuevas
+      images: allImageNames
     };
   } catch (err) {
     await connection.rollback();
@@ -289,6 +281,7 @@ const updateProduct = async (productId, data, userId, files) => {
     connection.release();
   }
 };
+
 
 const deleteProduct = async (productId, userId) => {
   const connection = await db.getConnection();
@@ -322,7 +315,6 @@ const deleteProduct = async (productId, userId) => {
     connection.release();
   }
 };
-
 const getProductById = async (productId) => {
   try {
     // Consulta para obtener los detalles del producto y del productor asociado
@@ -348,7 +340,11 @@ const getProductById = async (productId) => {
       throw new Error('Producto no encontrado');
     }
 
-    // Agrupar los datos del productor en un objeto
+    // Consulta para obtener las imágenes del producto
+    const [images] = await db.query('SELECT path FROM tb_image WHERE product_id = ?', [productId]);
+    const imagePaths = images.map(img => img.path);
+
+    // Agrupar los datos del producto con las imágenes en un objeto
     return {
       productId: product[0].productId,
       name: product[0].name,
@@ -362,12 +358,14 @@ const getProductById = async (productId) => {
       producer: {
         bussinesName: product[0].producerBussinesName,
         phone: product[0].producerPhone
-      }
+      },
+      images: imagePaths // Añadir las imágenes al objeto final
     };
   } catch (err) {
     throw new Error('Error al obtener el producto: ' + err.message);
   }
 };
+
 
 
 module.exports = { createProduct, listProductsByProducer, listAllProducts, updateProduct, deleteProduct, getProductById };

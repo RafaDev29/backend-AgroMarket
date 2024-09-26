@@ -41,11 +41,11 @@ const getAllProducts = async (req, res) => {
 const updateProduct = async (req, res) => {
   const { productId } = req.params;
 
-  // Validar el body usando el modelo de creación existente
-  const { error } = productsCreateModel.validate(req.body);
-  if (error) {
-    return errorResponse(res, error.details[0].message, 400);
-  }
+  // // Validar el body usando el modelo de creación existente
+  // const { error } = productsCreateModel.validate(req.body);
+  // if (error) {
+  //   return errorResponse(res, error.details[0].message, 400);
+  // }
 
   try {
     // Obtener el userId del token JWT
