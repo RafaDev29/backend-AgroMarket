@@ -28,17 +28,19 @@ const createProduct = async (data, userId, files) => {
 
     const producerId = producer[0].id;
 
-    // Insertar el producto en la tabla tb_products
+    // Insertar el producto en la tabla tb_products, incluyendo bulk_price y bulk_quantity
     const productQuery = `
-      INSERT INTO tb_products (name, description, category_id, price, stock, unitExtent, producer_id) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`;
+      INSERT INTO tb_products (name, description, category_id, price, bulk_price, bulk_quantity, stock, unitExtent, producer_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const productValues = [
-      data.name, 
-      data.description, 
-      data.category_id, 
-      data.price, 
-      data.stock, 
-      data.unitExtent, 
+      data.name,
+      data.description,
+      data.category_id,
+      parseFloat(data.price),           // Asegurarse de que price sea numérico
+      parseFloat(data.bulk_price) || null,  // Convertir bulk_price a número flotante
+      data.bulk_quantity || null,      // bulk_quantity sigue siendo un entero
+      data.stock,
+      data.unitExtent,
       producerId
     ];
     const [result] = await connection.query(productQuery, productValues);
@@ -86,6 +88,8 @@ const createProduct = async (data, userId, files) => {
   }
 };
 
+
+
 const listProductsByProducer = async (userId) => {
   try {
     // Obtener el producer_id utilizando el user_id
@@ -105,6 +109,8 @@ const listProductsByProducer = async (userId) => {
         p.description, 
         p.category_id, 
         p.price, 
+        p.bulk_price,       -- Añadir bulk_price
+        p.bulk_quantity,    -- Añadir bulk_quantity
         p.stock, 
         p.unitExtent,
         e.id AS unitExtentId
@@ -125,10 +131,12 @@ const listProductsByProducer = async (userId) => {
       description: product.description,
       category_id: product.category_id,
       price: product.price,
+      bulk_price: product.bulk_price,        
+      bulk_quantity: product.bulk_quantity,  
       stock: product.stock,
       unitExtent: product.unitExtent,
       unitExtentId: product.unitExtentId,
-      
+
       images: product.images
     }));
   } catch (err) {
@@ -147,6 +155,8 @@ const listAllProducts = async () => {
         p.description, 
         p.category_id, 
         p.price, 
+        p.bulk_price,       -- Añadir bulk_price
+        p.bulk_quantity,    -- Añadir bulk_quantity
         p.stock, 
         p.unitExtent,
         pr.bussinesName AS producerBussinesName,
@@ -170,6 +180,8 @@ const listAllProducts = async () => {
       description: product.description,
       category_id: product.category_id,
       price: product.price,
+      bulk_price: product.bulk_price,         // Añadir bulk_price al formato de salida
+      bulk_quantity: product.bulk_quantity,   // Añadir bulk_quantity al formato de salida
       stock: product.stock,
       unitExtent: product.unitExtent,
       unitExtentId: product.unitExtentId, // Agrega el unitExtentId al objeto
@@ -202,7 +214,7 @@ const updateProduct = async (productId, data, userId, files) => {
       SELECT p.id, p.producer_id 
       FROM tb_products p 
       JOIN tb_producers pr ON p.producer_id = pr.id 
-      WHERE p.id = ? AND pr.user_id = ?`, 
+      WHERE p.id = ? AND pr.user_id = ?`,
       [productId, userId]
     );
 
@@ -216,12 +228,12 @@ const updateProduct = async (productId, data, userId, files) => {
       SET name = ?, description = ?, category_id = ?, price = ?, stock = ?, unitExtent = ? 
       WHERE id = ?`;
     const updateValues = [
-      data.name, 
-      data.description, 
-      data.category_id, 
-      data.price, 
-      data.stock, 
-      data.unitExtent, 
+      data.name,
+      data.description,
+      data.category_id,
+      data.price,
+      data.stock,
+      data.unitExtent,
       productId
     ];
 
@@ -287,7 +299,7 @@ const deleteProduct = async (productId, userId) => {
       SELECT p.id, p.producer_id 
       FROM tb_products p 
       JOIN tb_producers pr ON p.producer_id = pr.id 
-      WHERE p.id = ? AND pr.user_id = ?`, 
+      WHERE p.id = ? AND pr.user_id = ?`,
       [productId, userId]
     );
 
@@ -351,4 +363,4 @@ const getProductById = async (productId) => {
   }
 };
 
-module.exports = { createProduct , listProductsByProducer, listAllProducts, updateProduct, deleteProduct, getProductById};
+module.exports = { createProduct, listProductsByProducer, listAllProducts, updateProduct, deleteProduct, getProductById };
