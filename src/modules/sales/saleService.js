@@ -152,7 +152,8 @@ const updateSale = async (saleId, data, file, userRole) => {
       'culminado': []
     };
 
-    if (!validTransitions[currentStatus].includes(data.status)) {
+    if (data.status && data.status !== currentStatus && !validTransitions[currentStatus].includes(data.status)) {
+
       throw new Error(`No se puede cambiar el estado de "${currentStatus}" a "${data.status}".`);
     }
 

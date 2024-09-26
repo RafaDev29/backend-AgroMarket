@@ -110,14 +110,14 @@ const listProductsByProducer = async (userId) => {
         p.description, 
         p.category_id, 
         p.price, 
-        p.bulk_price,       -- Añadir bulk_price
-        p.bulk_quantity,    -- Añadir bulk_quantity
+        p.bulk_price,       
+        p.bulk_quantity,    
         p.stock, 
         p.unitExtent,
         e.id AS unitExtentId
       FROM tb_products p
       LEFT JOIN tb_extend e ON p.unitExtent = e.name
-      WHERE p.producer_id = ?
+      WHERE p.producer_id = ? and  p.status = 'active'; 
     `, [producerId]);
 
     // Agregar las imágenes de cada producto
@@ -150,22 +150,24 @@ const listAllProducts = async () => {
   try {
     // Consultar todos los productos junto con sus detalles, detalles del productor y unitExtentId
     const [products] = await db.query(`
-      SELECT 
-        p.id AS productId, 
-        p.name, 
-        p.description, 
-        p.category_id, 
-        p.price, 
-        p.bulk_price,       -- Añadir bulk_price
-        p.bulk_quantity,    -- Añadir bulk_quantity
-        p.stock, 
-        p.unitExtent,
-        pr.bussinesName AS producerBussinesName,
-        pr.phone AS producerPhone,
-        e.id AS unitExtentId
-      FROM tb_products p
-      JOIN tb_producers pr ON p.producer_id = pr.id
-      LEFT JOIN tb_extend e ON p.unitExtent = e.name
+     SELECT 
+    p.id AS productId, 
+    p.name, 
+    p.description, 
+    p.category_id, 
+    p.price, 
+    p.bulk_price,       
+    p.bulk_quantity,    
+    p.stock, 
+    p.unitExtent,
+    pr.bussinesName AS producerBussinesName,
+    pr.phone AS producerPhone,
+    e.id AS unitExtentId
+FROM tb_products p
+JOIN tb_producers pr ON p.producer_id = pr.id
+LEFT JOIN tb_extend e ON p.unitExtent = e.name
+WHERE p.status = 'active';   
+
     `);
 
     // Agregar las imágenes de cada producto
@@ -282,7 +284,6 @@ const updateProduct = async (productId, data, userId, files) => {
   }
 };
 
-
 const deleteProduct = async (productId, userId) => {
   const connection = await db.getConnection();
 
@@ -302,12 +303,12 @@ const deleteProduct = async (productId, userId) => {
       throw new Error('This product does not belong to you or does not exist');
     }
 
-    // Eliminar el producto de la base de datos
-    await connection.query('DELETE FROM tb_products WHERE id = ?', [productId]);
+    // Actualizar el estado del producto a 'disable' en lugar de eliminarlo
+    await connection.query('UPDATE tb_products SET status = ? WHERE id = ?', ['disable', productId]);
 
     await connection.commit();
 
-    return { message: 'Product deleted successfully' };
+    return { message: 'Product status updated to disable successfully' };
   } catch (err) {
     await connection.rollback();
     throw new Error(err.message);
@@ -315,6 +316,7 @@ const deleteProduct = async (productId, userId) => {
     connection.release();
   }
 };
+
 const getProductById = async (productId) => {
   try {
     // Consulta para obtener los detalles del producto y del productor asociado
@@ -333,7 +335,7 @@ const getProductById = async (productId) => {
         pr.phone AS producerPhone
       FROM tb_products p
       JOIN tb_producers pr ON p.producer_id = pr.id
-      WHERE p.id = ?
+      WHERE p.id = ?  and p.status = 'active'; 
     `, [productId]);
 
     if (product.length === 0) {
