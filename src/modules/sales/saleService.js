@@ -5,6 +5,7 @@ const Client = require('ssh2-sftp-client');
 const sftp = new Client();
 
 const createSale = async (data, user_id, role) => {
+  // Validación de los datos ingresados
   const { error } = saleCreateModel.validate(data);
   if (error) {
     throw new Error(error.details[0].message);
@@ -28,6 +29,7 @@ const createSale = async (data, user_id, role) => {
     const unitName = extend[0].name.toLowerCase(); // Convertimos a minúsculas
     console.log('Unidad seleccionada por el cliente (unitName):', unitName);
 
+    // Verificar que el cliente existe en tb_customer
     const [customer] = await connection.query('SELECT id FROM tb_customer WHERE user_id = ?', [user_id]);
     if (customer.length === 0) {
       throw new Error('El cliente no existe');
@@ -36,15 +38,30 @@ const createSale = async (data, user_id, role) => {
     const customerId = customer[0].id;
     console.log('Customer ID:', customerId);
 
-    const [product] = await connection.query('SELECT price, unitExtent FROM tb_products WHERE id = ?', [data.product_id]);
+    // Obtener información del producto, incluyendo bulk_quantity y bulk_price
+    const [product] = await connection.query('SELECT price, bulk_quantity, bulk_price, unitExtent FROM tb_products WHERE id = ?', [data.product_id]);
     if (product.length === 0) {
       throw new Error('El producto no existe');
     }
 
-    const unitPrice = parseFloat(product[0].price);
+    const regularPrice = parseFloat(product[0].price);
+    const bulkQuantity = product[0].bulk_quantity;
+    const bulkPrice = parseFloat(product[0].bulk_price);
     const productUnit = product[0].unitExtent.toLowerCase(); // Convertimos a minúsculas
     console.log('Unidad de medida del producto (productUnit):', productUnit);
-    console.log('Precio unitario del producto (unitPrice):', unitPrice);
+    console.log('Precio unitario del producto (regularPrice):', regularPrice);
+    console.log('Precio a granel del producto (bulkPrice):', bulkPrice);
+    console.log('Cantidad mínima para precio a granel (bulkQuantity):', bulkQuantity);
+
+    // Seleccionar el precio correcto basado en la cantidad
+    let unitPrice;
+    if (data.amount >= bulkQuantity) {
+      unitPrice = bulkPrice;
+      console.log('Usando el precio a granel:', unitPrice);
+    } else {
+      unitPrice = regularPrice;
+      console.log('Usando el precio regular:', unitPrice);
+    }
 
     let subtotal;
 
@@ -59,11 +76,13 @@ const createSale = async (data, user_id, role) => {
       throw new Error('Las unidades de medida no coinciden o la conversión no está soportada.');
     }
 
+    // Cálculo del IGV y precio total
     const igv = subtotal * 0.18;
     const totalPrice = subtotal + igv;
     console.log('IGV calculado:', igv);
     console.log('Precio total calculado (totalPrice):', totalPrice);
 
+    // Insertar la venta en tb_sales
     const saleQuery = 'INSERT INTO tb_sales (customer_id, amount, totalPrice) VALUES (?, ?, ?)';
     const saleValues = [customerId, data.amount, totalPrice];
     const [saleResult] = await connection.query(saleQuery, saleValues);
@@ -77,6 +96,7 @@ const createSale = async (data, user_id, role) => {
     await connection.query(detailQuery, detailValues);
     console.log('Detalle de la venta guardado con valores:', detailValues);
 
+    // Confirmar la transacción
     await connection.commit();
 
     return {
@@ -90,6 +110,7 @@ const createSale = async (data, user_id, role) => {
     connection.release();
   }
 };
+
 
 
 
@@ -374,6 +395,7 @@ const listSales = async (userId, role) => {
     const [sales] = await db.query(salesQuery, salesParams);
 
     if (sales.length === 0) {
+      
       return []; // Si no hay ventas, retornar una lista vacía
     }
 
@@ -399,6 +421,7 @@ const listSales = async (userId, role) => {
 
     // Procesar cada venta
     for (let sale of sales) {
+      sale.igv = parseFloat(sale.igv).toFixed(2);
       // Asignar los vouchers correspondientes
       const saleVouchers = vouchers.filter(v => v.sale_id === sale.saleId);
       sale.vouchers = {
@@ -503,7 +526,7 @@ const getSaleById = async (userId, role, saleId) => {
       'SELECT type, path FROM tb_voucher WHERE sale_id = ?',
       [sale.saleId]
     );
-
+    sale.igv = parseFloat(sale.igv).toFixed(2);
     sale.vouchers = {
       COMPROBANTE: vouchers.filter(v => v.type === 'COMPROBANTE').map(v => v.path),
       PAY: vouchers.filter(v => v.type === 'PAY').map(v => v.path)
