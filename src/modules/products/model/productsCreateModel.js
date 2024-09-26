@@ -18,7 +18,9 @@ const productsCreateModel = Joi.object({
     'number.base': 'Stock must be an integer',
     'any.required': 'Stock is required'
   }),
-  unitExtent: Joi.string().optional()
+  unitExtent: Joi.string().optional(),
+  bulk_price: Joi.string().optional(),
+  bulk_quantity: Joi.number().integer().optional(),
 });
 
 module.exports = productsCreateModel;
