@@ -356,36 +356,46 @@ const listSales = async (userId, role) => {
 
     // Consulta SQL común
     const salesQuery = `
-        SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
-               p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
-               pr.id as producerId, pr.name as producerName, pr.bussinesName as producerBussinesName, pr.phone as producerPhone, pr.document as producerDocument,
-               c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone as customerPhone, c.document as customerDocument,
-               e.name as unitName
-        FROM tb_sales s
-        JOIN tb_detailSale ds ON s.id = ds.sale_id
-        JOIN tb_products p ON ds.product_id = p.id
-        JOIN tb_producers pr ON p.producer_id = pr.id
-        JOIN tb_customer c ON s.customer_id = c.id
-        JOIN tb_extend e ON ds.extend_id = e.id
-        WHERE ${roleCondition}
-      `;
+      SELECT s.id as saleId, s.customer_id, s.amount, s.totalPrice, ds.product_id, ds.unitPrice, ds.igv, ds.extend_id, ds.status, ds.subtotal,
+             p.name as productName, p.description as productDescription, p.category_id, p.price as productPrice, p.stock, p.unitExtent, 
+             pr.id as producerId, pr.name as producerName, pr.bussinesName as producerBussinesName, pr.phone as producerPhone, pr.document as producerDocument,
+             c.firstName as customerFirstName, c.lastName as customerLastName, c.bussinesName, c.phone as customerPhone, c.document as customerDocument,
+             e.name as unitName
+      FROM tb_sales s
+      JOIN tb_detailSale ds ON s.id = ds.sale_id
+      JOIN tb_products p ON ds.product_id = p.id
+      JOIN tb_producers pr ON p.producer_id = pr.id
+      JOIN tb_customer c ON s.customer_id = c.id
+      JOIN tb_extend e ON ds.extend_id = e.id
+      WHERE ${roleCondition}
+    `;
 
     const salesParams = [userId];
     const [sales] = await db.query(salesQuery, salesParams);
 
+    if (sales.length === 0) {
+      return []; // Si no hay ventas, retornar una lista vacía
+    }
+
     // Consulta para obtener todos los vouchers de las ventas
     const saleIds = sales.map(sale => sale.saleId);
-    const [vouchers] = await db.query(
-      `SELECT sale_id, type, path FROM tb_voucher WHERE sale_id IN (?)`,
-      [saleIds]
-    );
+    let vouchers = [];
+    if (saleIds.length > 0) {
+      [vouchers] = await db.query(
+        `SELECT sale_id, type, path FROM tb_voucher WHERE sale_id IN (?)`,
+        [saleIds]
+      );
+    }
 
     // Consulta para obtener todas las imágenes de los productos
     const productIds = sales.map(sale => sale.product_id);
-    const [images] = await db.query(
-      `SELECT product_id, path FROM tb_image WHERE product_id IN (?)`,
-      [productIds]
-    );
+    let images = [];
+    if (productIds.length > 0) {
+      [images] = await db.query(
+        `SELECT product_id, path FROM tb_image WHERE product_id IN (?)`,
+        [productIds]
+      );
+    }
 
     // Procesar cada venta
     for (let sale of sales) {
@@ -446,6 +456,7 @@ const listSales = async (userId, role) => {
     throw new Error('Error al listar las ventas: ' + err.message);
   }
 };
+
 
 
 const getSaleById = async (userId, role, saleId) => {

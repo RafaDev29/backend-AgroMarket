@@ -224,18 +224,20 @@ const updateProduct = async (productId, data, userId, files) => {
 
     // Actualizar los demás campos del producto en la base de datos
     const updateQuery = `
-      UPDATE tb_products 
-      SET name = ?, description = ?, category_id = ?, price = ?, stock = ?, unitExtent = ? 
-      WHERE id = ?`;
-    const updateValues = [
-      data.name,
-      data.description,
-      data.category_id,
-      data.price,
-      data.stock,
-      data.unitExtent,
-      productId
-    ];
+  UPDATE tb_products 
+  SET name = ?, description = ?, category_id = ?, price = ?, bulk_price = ?, bulk_quantity = ?, stock = ?, unitExtent = ? 
+  WHERE id = ?`;
+  const updateValues = [
+    data.name,
+    data.description,
+    data.category_id,
+    data.price,
+    data.bulk_price || null,       
+    data.bulk_quantity || null,    
+    data.stock,
+    data.unitExtent,
+    productId
+  ];
 
     await connection.query(updateQuery, updateValues);
 
@@ -331,6 +333,8 @@ const getProductById = async (productId) => {
         p.description, 
         p.category_id, 
         p.price, 
+        p.bulk_price,       
+        p.bulk_quantity,    
         p.stock, 
         p.unitExtent,
         pr.bussinesName AS producerBussinesName,
@@ -351,6 +355,8 @@ const getProductById = async (productId) => {
       description: product[0].description,
       category_id: product[0].category_id,
       price: product[0].price,
+      bulk_price: product[0].bulk_price,         
+      bulk_quantity: product[0].bulk_quantity,   
       stock: product[0].stock,
       unitExtent: product[0].unitExtent,
       producer: {
@@ -362,5 +368,6 @@ const getProductById = async (productId) => {
     throw new Error('Error al obtener el producto: ' + err.message);
   }
 };
+
 
 module.exports = { createProduct, listProductsByProducer, listAllProducts, updateProduct, deleteProduct, getProductById };
