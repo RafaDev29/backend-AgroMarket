@@ -7,7 +7,8 @@ const customerCreateModel = Joi.object({
   lastName: Joi.string().required(),
   bussinesName: Joi.string().optional(),
   phone: Joi.string().optional(),
-  document: Joi.string().optional()
+  document: Joi.string().optional(),
+  direction: Joi.string().required()
 });
 
 module.exports = customerCreateModel;

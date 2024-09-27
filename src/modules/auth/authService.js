@@ -19,6 +19,22 @@ const login = async (username, password) => {
       throw new Error('Usuario o contraseña invalido');
     }
 
+    // Objeto de respuesta inicial con direction como cadena vacía
+    let response = {
+      userId: user[0].id,
+      username: user[0].username,
+      role: user[0].role,
+      direction: ""  // Campo direction con valor por defecto ""
+    };
+
+    // Si el rol es CUSTOMER, buscar el campo direction en tb_customer
+    if (user[0].role === 'CUSTOMER') {
+      const [customerData] = await db.query('SELECT direction FROM tb_customer WHERE user_id = ?', [user[0].id]);
+      if (customerData.length > 0) {
+        response.direction = customerData[0].direction; // Reemplazar con la dirección del cliente
+      }
+    }
+
     // Generar el token JWT
     const token = jwt.sign(
       {
@@ -30,6 +46,9 @@ const login = async (username, password) => {
       { expiresIn: '24h' }
     );
 
+    // Agregar el token a la respuesta
+    response.token = token;
+
     // Almacenar los datos del usuario (sin la contraseña)
     userStorage.setUser({
       userId: user[0].id,
@@ -37,15 +56,12 @@ const login = async (username, password) => {
       role: user[0].role,
     });
 
-    return { 
-      userId: user[0].id,
-      username: user[0].username,
-      role: user[0].role,
-      token 
-    };
+    return response;  // Devolver el objeto de respuesta con direction como "" si no es CUSTOMER
   } catch (err) {
     throw new Error(err.message);
   }
 };
+
+
 
 module.exports = { login };

@@ -9,35 +9,35 @@ const createCustomer = async (data) => {
   try {
     await connection.beginTransaction();
 
-    // Validar que el username no exista
+ 
     const [existingUser] = await connection.query('SELECT id FROM tb_user WHERE username = ?', [data.username]);
     if (existingUser.length > 0) {
       throw new Error('Username already exists');
     }
 
-    // Validar que el DNI tenga 7 dígitos
+
     if (!/^\d{8}$/.test(data.document)) {
       throw new Error('Document (DNI) must have exactly 8 digits');
     }
 
-    // Validar que el teléfono tenga 9 dígitos
+
     if (!/^\d{9}$/.test(data.phone)) {
       throw new Error('Phone number must have exactly 9 digits');
     }
 
-    // Cifrar la contraseña
+
     const encryptedPassword = CryptoJS.AES.encrypt(data.password, secretKey).toString();
 
-    // Insertar el usuario en la tabla tb_user
+
     const userQuery = 'INSERT INTO tb_user (username, password, role) VALUES (?, ?, ?)';
     const userValues = [data.username, encryptedPassword, 'CUSTOMER'];
     const [userResult] = await connection.query(userQuery, userValues);
 
     const userId = userResult.insertId;
 
-    // Insertar el customer en la tabla tb_customer
-    const customerQuery = 'INSERT INTO tb_customer (user_id, firstName, lastName, bussinesName, phone, document) VALUES (?, ?, ?, ?, ?, ?)';
-    const customerValues = [userId, data.firstName, data.lastName, data.bussinesName, data.phone, data.document];
+ 
+    const customerQuery = 'INSERT INTO tb_customer (user_id, firstName, lastName, bussinesName, phone, document , direction) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    const customerValues = [userId, data.firstName, data.lastName, data.bussinesName, data.phone, data.document, data.direction];
     await connection.query(customerQuery, customerValues);
 
     await connection.commit();
@@ -50,7 +50,8 @@ const createCustomer = async (data) => {
       lastName: data.lastName,
       bussinesName: data.bussinesName,
       phone: data.phone,
-      document: data.document
+      document: data.document,
+      direction: data.direction
     };
   } catch (err) {
     await connection.rollback();
