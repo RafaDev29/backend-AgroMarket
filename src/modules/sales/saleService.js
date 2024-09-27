@@ -390,6 +390,7 @@ const listSales = async (userId, role) => {
       JOIN tb_customer c ON s.customer_id = c.id
       JOIN tb_extend e ON ds.extend_id = e.id
       WHERE ${roleCondition}
+      ORDER BY s.id DESC 
     `;
 
     const salesParams = [userId];
