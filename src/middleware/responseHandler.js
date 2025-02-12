@@ -9,7 +9,7 @@ const responseHandler = (req, res, next) => {
       });
     };
   
-    res.error = (message = 'An error occurred', status = 500, data = null) => {
+    res.error = (message = 'An error occurredd', status = 500, data = null) => {
       res.status(status).json({
         status,
         message,
