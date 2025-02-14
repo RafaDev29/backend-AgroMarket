@@ -636,5 +636,5 @@ const deleteSale = async (userId, role, saleId) => {
   }
 };
 
-
+//holi
 module.exports = { createSale, updateSale, addPaymentImage, listSales, getSaleById, deleteSale };
