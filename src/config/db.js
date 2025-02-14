@@ -11,4 +11,18 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+async function checkConnection() {
+  try {
+    const connection = await pool.promise().getConnection(); // Usamos `.promise()` aquí
+    console.log('✅ Conectado a la base de datos correctamente');
+
+    connection.release(); // Liberamos la conexión si se estableció
+  } catch (error) {
+    console.error('❌ Error al conectar a la base de datos:', error);
+  }
+}
+
+// Llamar a la función de prueba de conexión
+checkConnection();
+
 module.exports = pool.promise();

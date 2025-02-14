@@ -1,0 +1,114 @@
+
+create database agroMarket;
+use agroMarket;
+
+create table tb_user (
+    id int auto_increment primary key,
+    username varchar(255) not null unique,
+    password varchar(255) not null,
+    role enum('SUPER_MASTER', 'MASTER', 'COMPANY', 'CUSTOMER', 'ADMIN', 'PRODUCER') default 'CUSTOMER',
+    created_at timestamp default current_timestamp
+);
+
+-- Tabla de clientes
+create table tb_customer (
+    id int auto_increment primary key,
+    user_id int not null,
+    firstName varchar(255) not null,
+    lastName varchar(255) not null,
+    bussinesName varchar(255),
+    phone varchar(9) not null,
+    document varchar(8) not null unique,
+    direction varchar(255),
+    created_at timestamp default current_timestamp,
+    foreign key (user_id) references tb_user(id) on delete cascade
+);
+
+-- Tabla de categorías
+create table tb_category (
+    id int auto_increment primary key,
+    name varchar(255) not null unique,
+    created_at timestamp default current_timestamp
+);
+
+-- Tabla de extend
+create table tb_extend (
+    id int auto_increment primary key,
+    name varchar(255) not null unique,
+    created_at timestamp default current_timestamp
+);
+
+-- Tabla de imágenes
+create table tb_image (
+    id int auto_increment primary key,
+    product_id int not null,
+    path varchar(255) not null,
+    created_at timestamp default current_timestamp,
+    foreign key (product_id) references tb_products(id) on delete cascade
+);
+
+-- Tabla de productores
+create table tb_producers (
+    id int auto_increment primary key,
+    user_id int not null,
+    name varchar(255) not null,
+    bussinesName varchar(255),
+    document varchar(20) not null unique,
+    phone varchar(9) not null,
+    created_at timestamp default current_timestamp,
+    foreign key (user_id) references tb_user(id) on delete cascade
+);
+
+-- Tabla de productos
+create table tb_products (
+    id int auto_increment primary key,
+    name varchar(255) not null,
+    description text,
+    category_id int not null,
+    price decimal(10,2) not null,
+    bulk_price decimal(10,2),
+    bulk_quantity int,
+    stock int not null,
+    unitExtent varchar(255),
+    producer_id int not null,
+    status enum('active', 'disable') default 'active',
+    created_at timestamp default current_timestamp,
+    foreign key (category_id) references tb_category(id) on delete cascade,
+    foreign key (producer_id) references tb_producers(id) on delete cascade
+);
+
+-- Tabla de ventas
+create table tb_sales (
+    id int auto_increment primary key,
+    customer_id int not null,
+    amount decimal(10,2) not null,
+    totalPrice decimal(10,2) not null,
+    created_at timestamp default current_timestamp,
+    foreign key (customer_id) references tb_customer(id) on delete cascade
+);
+
+-- Tabla de detalles de venta
+create table tb_detailSale (
+    id int auto_increment primary key,
+    sale_id int not null,
+    product_id int not null,
+    unitPrice decimal(10,2) not null,
+    igv decimal(10,2) not null,
+    extend_id int not null,
+    voucher_id int,
+    status enum('solicitado', 'activo', 'aprobado', 'culminado') default 'solicitado',
+    subtotal decimal(10,2) not null,
+    foreign key (sale_id) references tb_sales(id) on delete cascade,
+    foreign key (product_id) references tb_products(id) on delete cascade,
+    foreign key (extend_id) references tb_extend(id) on delete cascade
+);
+
+-- Tabla de vouchers
+create table tb_voucher (
+    id int auto_increment primary key,
+    path varchar(255) not null,
+    sale_id int not null,
+    type enum('COMPROBANTE', 'PAY') not null,
+    created_at timestamp default current_timestamp,
+    foreign key (sale_id) references tb_sales(id) on delete cascade
+);
